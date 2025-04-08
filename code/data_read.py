@@ -142,13 +142,13 @@ def process_subject_vivosight_data(
     return subject_data
 
 
-def process_subject_scan_data(file: str):
+def process_subject_scan_data(file: str, subject_data = None):
     """ """
 
     subject_id = collect_subject_id_scan_information(file)
     try:
-        data_before_exp = pd.read_excel(file, "Surface Area_AE")
-        data_after_exp = pd.read_excel(file, "Surface Area_BE")
+        data_before_exp = pd.read_excel(file, "Surface Area_BE")
+        data_after_exp = pd.read_excel(file, "Surface Area_AE")
     except Exception as reason:
         data_before_exp = None
         data_after_exp = None
@@ -156,22 +156,9 @@ def process_subject_scan_data(file: str):
             f"There is an issue with \t {file}. \t This data will be excluded from the analysis. Reason: {reason}"
         )
 
-    # print(data_before_exp)
-    b_scan_id = data_before_exp["Scan#"].dropna()
-    b_location = data_before_exp["Location"].dropna()
-
-    a_scan_id = data_after_exp["Scan#"].dropna()
-    a_location = data_after_exp["Location"].dropna()
-
-    if subject_id in subject_info_data:
-        subject_info_data[subject_id]["before_scan_id"].extend(list(b_scan_id))
-        subject_info_data[subject_id]["before_location"].extend(list(b_location))
-        subject_info_data[subject_id]["after_scan_id"].extend(list(a_scan_id))
-        subject_info_data[subject_id]["after_location"].extend(list(a_location))
+    if subject_data is not None:
+        subject_data.add_scan_data(data_before_exp,data_after_exp )
     else:
-        subject_info_data[subject_id] = {
-            "before_scan_id": list(b_scan_id),
-            "before_location": list(b_location),
-            "after_scan_id": list(a_scan_id),
-            "after_location": list(a_location),
-        }
+        subject_data = data_types.Subject(subject_id=subject_id)
+
+    return subject_data
