@@ -7,6 +7,12 @@ import numpy as np
 class Subject:
     def __init__(self, subject_id):
         self.subject_id = subject_id
+        self.visit = None
+        self.return_visit = None
+
+
+class Visit:
+    def __init__(self):
         self.scans = None
         self.skin_roughness = None
         self.epidermal = []
@@ -54,11 +60,20 @@ class Subject:
         Get pre and post exposure information from excel sheets
         """
 
+    def process_subject_scan_data(self, file: str, return_visit: bool):
+        """ """
+        try:
+            before_exposure_data = pd.read_excel(file, "Surface Area_BE")
+            after_exposure_data = pd.read_excel(file, "Surface Area_AE")
+        except Exception as reason:
+            print(
+                f"There is an issue with \t {file}. \t This data will be excluded from the analysis. Reason: {reason}"
+            )
+
         self.before_scan_id = before_exposure_data["Scan#"].dropna()
         self.locations = before_exposure_data["Location"].dropna()
 
         self.after_scan_id = after_exposure_data["Scan#"].dropna()
-
 
     def add_tewl_scan(
         self, scan_id, location=None, arm=None, post_exposure=None, return_visit=None
@@ -170,7 +185,11 @@ class Epidermal:
         )
 
         if self.min_location_index is not None:
-            ax.plot(self.depth_data["Depth"][self.min_location_index],self.depth_data["Mean A-scan"][self.min_location_index],'x')
+            ax.plot(
+                self.depth_data["Depth"][self.min_location_index],
+                self.depth_data["Mean A-scan"][self.min_location_index],
+                "x",
+            )
 
         plt.xticks(visible=False)
         if exposed:
@@ -187,7 +206,6 @@ class Epidermal:
         # plt.savefig(f"../data_out/epidermal_data_out/subject_id_{subject_id}_scan_id_{self.scan_id}.pdf")
         # plt.close()
         plt.show()
-
 
     def compute_derivatives(self):
         """Finding the first and second derivative."""
@@ -221,7 +239,6 @@ class Epidermal:
                 break
             else:
                 old_value = new_value
-    
 
     def approach_2(self, begin_skip, end_skip):
         """location of the largest change in the derivative."""
@@ -249,9 +266,9 @@ class BloodFlow:
     def __init__(self, data_file, scan_id, exposed, location, return_visit):
         self.data_file = data_file
         bloodflow_depth_data = pd.read_csv(data_file, header=1, encoding="latin1")
-        self.depth = bloodflow_depth_data['Depth (mm)']
-        self.vascular_density = bloodflow_depth_data['Vascular density']
-        self.vessel_diameter = bloodflow_depth_data['Vessel diameter']
+        self.depth = bloodflow_depth_data["Depth (mm)"]
+        self.vascular_density = bloodflow_depth_data["Vascular density"]
+        self.vessel_diameter = bloodflow_depth_data["Vessel diameter"]
         plexus_data = pd.read_csv(data_file, header=0, nrows=0, encoding="latin1")
         self.plexus_data = float(plexus_data.columns[1].split(" ")[0])
         self.scan_id = scan_id
@@ -260,7 +277,7 @@ class BloodFlow:
         self.return_visit = return_visit
         self.max_density = None
 
-    def plot_vascular_density(self, subject_id, exposed):
+    def plot_vascular_density(self, subject_id):
         """
         Plot the vasuclar density plot ( vessel depth and vessel density)
         """
@@ -276,7 +293,9 @@ class BloodFlow:
                 f"Subject id: {subject_id}  Scan id: {self.scan_id} Post-Exposure Location {self.location}"
             )
         else:
-            plt.title(f"Subject id: {subject_id}  Scan id: {self.scan_id} Pre-Exposure Location {self.location}")
+            plt.title(
+                f"Subject id: {subject_id}  Scan id: {self.scan_id} Pre-Exposure Location {self.location}"
+            )
         plt.ylim(bottom=0)
         plt.ylabel("")
         plt.xlabel("Depth (mm)")
