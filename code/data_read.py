@@ -15,6 +15,7 @@ def collect_subject_vivosight_folder(subject: str, vivosight_path: str, scan_pat
         if folder.is_dir() and folder.name.startswith(subject)
     ]
 
+    print(subject,scan_folder)
     scan_folder = collect_subject_scan_folder(subject, scan_path)
 
     return matching_folders,scan_folder
