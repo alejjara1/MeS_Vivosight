@@ -16,9 +16,8 @@ class Subject:
         self.num_epidermal = 0
         self.num_blood_flow = 0
         self.before_scan_id = None
-        self.before_location = None
+        self.locations = None
         self.after_scan_id = None
-        self.after_location = None
 
     def add_skin_roughness(self, skin_roughness_data):
         """
@@ -56,10 +55,10 @@ class Subject:
         """
 
         self.before_scan_id = before_exposure_data["Scan#"].dropna()
-        self.before_location = before_exposure_data["Location"].dropna()
+        self.locations = before_exposure_data["Location"].dropna()
 
         self.after_scan_id = after_exposure_data["Scan#"].dropna()
-        self.after_location = after_exposure_data["Location"].dropna()
+
 
     def add_tewl_scan(
         self, scan_id, location=None, arm=None, post_exposure=None, return_visit=None
@@ -103,11 +102,12 @@ class Scan:
 
 
 class Epidermal:
-    def __init__(self, data_file, scan_id, location, return_visit):
+    def __init__(self, data_file, scan_id, exposed, location, return_visit):
         self.data_file = data_file
         self.depth_data = pd.read_csv(data_file, header=6, encoding="latin1")
         self.summary_data = pd.read_csv(data_file, header=0, nrows=5, encoding="latin1")
         self.scan_id = scan_id
+        self.exposed = exposed
         self.location = location
         self.return_visit = return_visit
         self.min_value = None
@@ -231,7 +231,7 @@ class Epidermal:
 
 
 class SkinRoughness:
-    def __init__(self, data_file, scan_id, location, return_visit):
+    def __init__(self, data_file, scan_id, exposed, location, return_visit):
         self.data_file = data_file
 
         _roughness_data = pd.read_csv(data_file, header=None, encoding="latin1")
@@ -240,12 +240,13 @@ class SkinRoughness:
         self.Rq = _roughness_data.iloc[2, 1]
 
         self.scan_id = scan_id
+        self.exposed = exposed
         self.location = location
         self.return_visit = return_visit
 
 
 class BloodFlow:
-    def __init__(self, data_file, scan_id, location, return_visit):
+    def __init__(self, data_file, scan_id, exposed, location, return_visit):
         self.data_file = data_file
         bloodflow_depth_data = pd.read_csv(data_file, header=1, encoding="latin1")
         self.depth = bloodflow_depth_data['Depth (mm)']
@@ -254,6 +255,7 @@ class BloodFlow:
         plexus_data = pd.read_csv(data_file, header=0, nrows=0, encoding="latin1")
         self.plexus_data = float(plexus_data.columns[1].split(" ")[0])
         self.scan_id = scan_id
+        self.exposed = exposed
         self.location = location
         self.return_visit = return_visit
         self.max_density = None
@@ -269,12 +271,12 @@ class BloodFlow:
         )
 
         # plt.xticks(visible=False)
-        if exposed:
+        if self.exposed:
             plt.title(
-                f"Subject id: {subject_id}  Scan id: {self.scan_id} Post-Exposure"
+                f"Subject id: {subject_id}  Scan id: {self.scan_id} Post-Exposure Location {self.location}"
             )
         else:
-            plt.title(f"Subject id: {subject_id}  Scan id: {self.scan_id} Pre-Exposure")
+            plt.title(f"Subject id: {subject_id}  Scan id: {self.scan_id} Pre-Exposure Location {self.location}")
         plt.ylim(bottom=0)
         plt.ylabel("")
         plt.xlabel("Depth (mm)")
