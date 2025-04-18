@@ -2,6 +2,7 @@ import pandas as pd
 import scipy as sp
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 
 class Subject:
@@ -276,6 +277,8 @@ class BloodFlow:
         self.location = location
         self.return_visit = return_visit
         self.max_density = None
+        self.max_diameter = None
+        self.plot_all_depth_vs_max_vessel_diameter = None
 
     def plot_vascular_density(self, subject_id):
         """
@@ -307,3 +310,7 @@ class BloodFlow:
     def get_max_density(self):
         """Find the maximum density value."""
         self.max_density = self.vascular_density.max()
+
+    def get_max_diameter(self):
+        """"Find the maximum diameter value."""
+        self.max_diameter = self.vessel_diameter.max()
