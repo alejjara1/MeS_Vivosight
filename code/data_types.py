@@ -174,7 +174,7 @@ class Epidermal:
             self.depth_data["Depth"][lower_bound_index:upper_bound_index],
         )
 
-    def plot_a_scan(self, subject_id, exposed):
+    def plot_a_scan(self, subject_id):
         """
         Plot the A-scan data
         """
@@ -193,7 +193,7 @@ class Epidermal:
             )
 
         plt.xticks(visible=False)
-        if exposed:
+        if self.exposed:
             plt.title(
                 f"Subject id: {subject_id}  Scan id: {self.scan_id} Post-Exposure"
             )
@@ -310,7 +310,14 @@ class BloodFlow:
     def get_max_density(self):
         """Find the maximum density value."""
         self.max_density = self.vascular_density.max()
+        return self.max_density
 
     def get_max_diameter(self):
-        """"Find the maximum diameter value."""
+        """ "Find the maximum diameter value."""
         self.max_diameter = self.vessel_diameter.max()
+        return self.max_diameter
+
+    def get_depth_max_diameter(self):
+        """Find the location at the maximum diameter value."""
+        index = np.argmax(self.vessel_diameter)
+        return self.depth[index]

@@ -178,6 +178,9 @@ def process_subject_vivosight_data(
             min_location_id = np.max(visit_data.locations) - 4
             location_id = int(_location_id - min_location_id)
 
+            if location_id > 4:
+                print(subject_id)
+
             try:
                 if data_type == "epidermal":
                     visit_data.add_epidermal(
