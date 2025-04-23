@@ -278,7 +278,7 @@ class BloodFlow:
         self.return_visit = return_visit
         self.max_density = None
         self.max_diameter = None
-        self.plot_all_depth_vs_max_vessel_diameter = None
+    
 
     def plot_vascular_density(self, subject_id):
         """
@@ -302,6 +302,7 @@ class BloodFlow:
         plt.ylim(bottom=0)
         plt.ylabel("")
         plt.xlabel("Depth (mm)")
+        plt.xlim(bottom=0)
         plt.legend()
         # plt.savefig(f"../data_out/epidermal_data_out/subject_id_{subject_id}_scan_id_{self.scan_id}.pdf")
         # plt.close()
