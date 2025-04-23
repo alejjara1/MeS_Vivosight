@@ -178,8 +178,26 @@ def process_subject_vivosight_data(
             min_location_id = np.max(visit_data.locations) - 4
             location_id = int(_location_id - min_location_id)
 
-            if location_id > 4:
-                print(subject_id)
+            if subject_id == "M16":
+                if _location_id == 1266:
+                    location_id = 1
+                elif _location_id == 1267:      
+                    location_id = 2         
+                elif _location_id == 1269:
+                    location_id = 3
+                elif _location_id == 1270:          
+                    location_id = 4
+
+            if subject_id == "Z47":
+                if _location_id == 1244:
+                    location_id = 1
+                elif _location_id == 1246:      
+                    location_id = 2         
+                elif _location_id == 1247:
+                    location_id = 3
+                elif _location_id == 1248:          
+                    location_id = 4
+
 
             try:
                 if data_type == "epidermal":

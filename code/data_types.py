@@ -1,8 +1,10 @@
+import os
 import pandas as pd
 import scipy as sp
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+
 
 
 class Subject:
@@ -178,6 +180,10 @@ class Epidermal:
         """
         Plot the A-scan data
         """
+        # Ensure the output directory exists
+        output_dir = "../data_out/epidermal_data_out"
+        os.makedirs(output_dir, exist_ok=True)
+
         fig, ax = plt.subplots()
         plt.plot(
             self.depth_data["Depth"],
@@ -192,21 +198,20 @@ class Epidermal:
                 "x",
             )
 
-        plt.xticks(visible=False)
+        # plt.xticks(visible=True)
         if self.exposed:
             plt.title(
-                f"Subject id: {subject_id}  Scan id: {self.scan_id} Post-Exposure"
+                f"Subject id: {subject_id} Location {self.location}  Scan id: {self.scan_id} Post-Exposure"
             )
         else:
-            plt.title(f"Subject id: {subject_id}  Scan id: {self.scan_id} Pre-Exposure")
+            plt.title(f"Subject id: {subject_id}  Location {self.location} Scan id: {self.scan_id} Pre-Exposure")
         plt.ylim(bottom=0)
         plt.ylabel("Intensity")
         plt.xlabel("Depth (mm)")
         plt.xlim(0, 2)
         plt.legend()
-        # plt.savefig(f"../data_out/epidermal_data_out/subject_id_{subject_id}_scan_id_{self.scan_id}.pdf")
-        # plt.close()
-        plt.show()
+        plt.savefig(f"{output_dir}/subject_id_{subject_id}_scan_id_{self.scan_id}.pdf")
+        plt.close()
 
     def compute_derivatives(self):
         """Finding the first and second derivative."""
