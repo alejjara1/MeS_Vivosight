@@ -6,7 +6,7 @@ import numpy as np
 import data_types
 import re
 
-
+#testing 
 def collect_subject_vivosight_folder(subject: str, vivosight_path: str, scan_path: str):
 
     directory = Path(vivosight_path)
