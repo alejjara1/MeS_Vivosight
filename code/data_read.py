@@ -221,8 +221,6 @@ def process_subject_vivosight_data(
             except Exception as e:
                 print(f"Error reading {data_file}: {e}")
 
-        print(vivo_file, visit_data.blood_flow)
-
         if return_visit:
             subject.return_visit = visit_data
         else:
