@@ -1,32 +1,60 @@
-import os
 import pandas as pd
-import scipy as sp
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
-
+import Epidermal
+import Bloodflow
+import SkinRoughness
+import SkinSurface
 
 
 class Subject:
-    def __init__(self, subject_id):
+    def __init__(self, subject_id, exposure):
         self.subject_id = subject_id
+        self.exposure = exposure
         self.visit = None
         self.return_visit = None
 
 
 class Visit:
-    def __init__(self):
+    def __init__(self, subject):
+        self.subject = subject
         self.scans = None
         self.skin_roughness = None
         self.epidermal = []
-        self.blood_flow = None
+        self.blood_flow = []
+        self.skin_roughness = []
+        self.skin_surface = []
         self.num_scans = 0
         self.num_skin_roughness = 0
+        self.num_skin_surface = 0
         self.num_epidermal = 0
         self.num_blood_flow = 0
         self.before_scan_id = None
-        self.locations = None
+        self.before_locations = None
+        self.after_locations = None
         self.after_scan_id = None
+        self.inflection_depths = {
+            1: Epidermal.LocationData(),
+            2: Epidermal.LocationData(),
+            3: Epidermal.LocationData(),
+            4: Epidermal.LocationData(),
+        }
+        self.blood_data = {
+            1: Bloodflow.LocationData(),
+            2: Bloodflow.LocationData(),
+            3: Bloodflow.LocationData(),
+            4: Bloodflow.LocationData(),
+        }
+        self.skin_roughness_data = {
+            1: SkinRoughness.LocationData(),
+            2: SkinRoughness.LocationData(),
+            3: SkinRoughness.LocationData(),
+            4: SkinRoughness.LocationData(),
+        }
+        self.skin_surface_data = {
+            1: SkinSurface.LocationData(),
+            2: SkinSurface.LocationData(),
+            3: SkinSurface.LocationData(),
+            4: SkinSurface.LocationData(),
+        }
 
     def add_skin_roughness(self, skin_roughness_data):
         """
@@ -39,6 +67,17 @@ class Visit:
 
         self.num_skin_roughness += 1
 
+    def add_skin_surface(self, skin_surface_data):
+        """
+        skin roughness function
+        """
+        if self.skin_surface is None:
+            self.skin_surface = []
+
+        self.skin_surface.append(skin_surface_data)
+
+        self.num_skin_surface += 1
+
     def add_epidermal(self, epidermal_data):
         """
         epidermal data function
@@ -47,21 +86,162 @@ class Visit:
 
         self.num_epidermal += 1
 
+    def collect_epidermal_data(self, approach=0, plot=False):
+        """
+        Collect epidermal depth in convenient dictionary
+        """
+        for derm_scan in self.epidermal:
+            if derm_scan.location not in [1, 2, 3, 4]:
+                print(
+                    f"Subject ID {self.subject.subject_id} Invalid location: {derm_scan.location}"
+                )
+                continue
+
+            self.inflection_depths = derm_scan.get_epidermal_data(
+                self.inflection_depths, approach
+            )
+
+            if plot:
+                derm_scan.plot_a_scan(self.subject.subject_id)
+
+    def collect_blood_scans(self):
+        """
+        Collect blood scan data in convenient dictionary
+        """
+        for b_scan in self.blood_flow:
+            if b_scan.location not in [1, 2, 3, 4]:
+                print(
+                    f"Subject ID {self.subject.subject_id} Invalid location: {b_scan.location}"
+                )
+                continue
+
+            self.blood_data = b_scan.set_blood_scan_data(self.blood_data)
+
+    def collect_skin_roughness_scans(self):
+        """
+        Collect skin roughness data in convenient dictionary
+        """
+        for s_scan in self.skin_roughness:
+            if s_scan.location not in [1, 2, 3, 4]:
+                print(
+                    f"Subject ID {self.subject.subject_id} Invalid location: {s_scan.location}"
+                )
+                continue
+
+            self.skin_roughness_data = s_scan.get_skin_roughness_data(
+                self.skin_roughness_data
+            )
+
+    def collect_skin_surface_scans(self):
+        """
+        Collect skin roughness data in convenient dictionary
+        """
+        for s_scan in self.skin_surface:
+            if s_scan.location not in [1, 2, 3, 4]:
+                print(
+                    f"Subject ID {self.subject.subject_id} Invalid location: {s_scan.location}"
+                )
+                continue
+
+            self.skin_surface_data = s_scan.get_skin_surface_data(
+                self.skin_surface_data
+            )
+
+    def get_all_location_averages(self):
+        """
+        Calculate pre and post averages for all locations.
+
+        Returns:
+            dict: Dictionary with location as key and dict of pre/post averages as value
+        """
+        averages = {}
+        for location in [1, 2, 3, 4]:
+            averages[location] = {
+                "pre": self.inflection_depths[location].get_pre_average(),
+                "post": self.inflection_depths[location].get_post_average(),
+            }
+        return averages
+
+    def save_inflection_data_to_file(self, output_dir):
+        """
+        Save all inflection depth data to a text file organized by subject ID.
+
+        Args:
+            output_dir: Directory to save the output files
+        """
+        import os
+
+        os.makedirs(output_dir, exist_ok=True)
+        filename = f"{output_dir}/{self.subject.subject_id}_inflection_depths.txt"
+
+        with open(filename, "w") as f:
+            f.write(f"Subject ID: {self.subject.subject_id}\n")
+            f.write(f"Exposure: {self.subject.exposure}\n")
+            f.write("=" * 60 + "\n\n")
+
+            for location in [1, 2, 3, 4]:
+                f.write(f"Location {location}:\n")
+                f.write("-" * 40 + "\n")
+
+                loc_data = self.inflection_depths[location]
+
+                # Pre-exposure data
+                f.write("  Pre-Exposure:\n")
+                if loc_data.pre:
+                    for i, point in enumerate(loc_data.pre, 1):
+                        depth_str = (
+                            f"{point.depth:.4f} mm"
+                            if point.depth and point.depth > 0
+                            else "N/A"
+                        )
+                        f.write(
+                            f"    {i}. Depth: {depth_str}, Approach: {point.approach}, Scan ID: {point.scan_id}\n"
+                        )
+                    pre_avg = loc_data.get_pre_average()
+                    pre_str = f"{pre_avg:.4f} mm" if pre_avg is not None else "N/A"
+                    f.write(f"    Average: {pre_str}\n")
+                else:
+                    f.write("    No data\n")
+
+                f.write("\n")
+
+                # Post-exposure data
+                f.write("  Post-Exposure:\n")
+                if loc_data.post:
+                    for i, point in enumerate(loc_data.post, 1):
+                        depth_str = (
+                            f"{point.depth:.4f} mm"
+                            if point.depth and point.depth > 0
+                            else "N/A"
+                        )
+                        f.write(
+                            f"    {i}. Depth: {depth_str}, Approach: {point.approach}, Scan ID: {point.scan_id}\n"
+                        )
+                    post_avg = loc_data.get_post_average()
+                    post_str = f"{post_avg:.4f} mm" if post_avg is not None else "N/A"
+                    f.write(f"    Average: {post_str}\n")
+                else:
+                    f.write("    No data\n")
+
+                f.write("\n")
+
+            # Summary averages
+            f.write("\nSummary - All Locations Averages:\n")
+            f.write("=" * 60 + "\n")
+            averages = self.get_all_location_averages()
+            for location, avgs in averages.items():
+                pre_str = f"{avgs['pre']:.4f}" if avgs["pre"] is not None else "N/A"
+                post_str = f"{avgs['post']:.4f}" if avgs["post"] is not None else "N/A"
+                f.write(f"Location {location}: Pre={pre_str} mm, Post={post_str} mm\n")
+
+        print(f"Data saved to: {filename}")
+
     def add_blood_flow(self, blood_flow_data):
         """
         blood flow data function
         """
-        if self.blood_flow is None:
-            self.blood_flow = []
-
         self.blood_flow.append(blood_flow_data)
-
         self.num_blood_flow += 1
-
-    def add_scan_data(self, before_exposure_data, after_exposure_data):
-        """
-        Get pre and post exposure information from excel sheets
-        """
 
     def process_subject_scan_data(self, file: str, return_visit: bool):
         """ """
@@ -74,9 +254,10 @@ class Visit:
             )
 
         self.before_scan_id = before_exposure_data["Scan#"].dropna()
-        self.locations = before_exposure_data["Location"].dropna()
+        self.before_locations = before_exposure_data["Location"].dropna()
 
         self.after_scan_id = after_exposure_data["Scan#"].dropna()
+        self.after_locations = after_exposure_data["Location"].dropna()
 
     def add_tewl_scan(
         self, scan_id, location=None, arm=None, post_exposure=None, return_visit=None
@@ -117,213 +298,3 @@ class Scan:
         self.location = location
         self.post_exposure = post_exposure
         self.return_visit = return_visit
-
-
-class Epidermal:
-    def __init__(self, data_file, scan_id, exposed, location, return_visit):
-        self.data_file = data_file
-        self.depth_data = pd.read_csv(data_file, header=6, encoding="latin1")
-        self.summary_data = pd.read_csv(data_file, header=0, nrows=5, encoding="latin1")
-        self.scan_id = scan_id
-        self.exposed = exposed
-        self.location = location
-        self.return_visit = return_visit
-        self.min_value = None
-        self.max_value = None
-        self.min_location_index = None
-
-    def find_min_max(self):
-        """
-        Find the minimum and maximum of the Mean A-scan data
-        """
-        self.min_value = self.depth_data["Mean A-scan"].min()
-        self.max_value = self.depth_data["Mean A-scan"].max()
-
-    def get_normalize_a_scan(self):
-        """
-        Normalize the Mean A-scan
-        """
-        self.find_min_max()
-        self.depth_at_max_intensity = self.depth_data["Depth"][
-            self.depth_data["Mean A-scan"].idxmax()
-        ]
-        self.normalized_a_scan = (self.depth_data["Mean A-scan"] - self.min_value) / (
-            self.max_value - self.min_value
-        )
-
-    def get_sid(self):
-        """
-        Calculate the Standard.....
-        """
-        value = 0.2
-        index = abs(self.normalized_a_scan - value).idxmin()
-        attenuation_depth = self.depth_data["Depth"].iloc[index]
-        self.sid = 0.8 / attenuation_depth
-
-    def get_AuC(self):
-        """
-        Integrate the curve
-        """
-        integration_depth = 0.2
-        lower_bound_index = self.depth_data["Mean A-scan"].idxmax()
-
-        upper_bound_index = abs(
-            self.depth_data["Depth"] - (self.depth_at_max_intensity + integration_depth)
-        ).idxmin()
-
-        self.AuC = sp.integrate.trapezoid(
-            self.normalized_a_scan[lower_bound_index:upper_bound_index],
-            self.depth_data["Depth"][lower_bound_index:upper_bound_index],
-        )
-
-    def plot_a_scan(self, subject_id):
-        """
-        Plot the A-scan data
-        """
-        # Ensure the output directory exists
-        output_dir = "../data_out/epidermal_data_out"
-        os.makedirs(output_dir, exist_ok=True)
-
-        fig, ax = plt.subplots()
-        plt.plot(
-            self.depth_data["Depth"],
-            self.depth_data["Mean A-scan"],
-            label="Mean A-Scan",
-        )
-
-        if self.min_location_index is not None:
-            ax.plot(
-                self.depth_data["Depth"][self.min_location_index],
-                self.depth_data["Mean A-scan"][self.min_location_index],
-                "x",
-            )
-
-        # plt.xticks(visible=True)
-        if self.exposed:
-            plt.title(
-                f"Subject id: {subject_id} Location {self.location}  Scan id: {self.scan_id} Post-Exposure"
-            )
-        else:
-            plt.title(f"Subject id: {subject_id}  Location {self.location} Scan id: {self.scan_id} Pre-Exposure")
-        plt.ylim(bottom=0)
-        plt.ylabel("Intensity")
-        plt.xlabel("Depth (mm)")
-        plt.xlim(0, 2)
-        plt.legend()
-        plt.savefig(f"{output_dir}/subject_id_{subject_id}_scan_id_{self.scan_id}.pdf")
-        plt.close()
-
-    def compute_derivatives(self):
-        """Finding the first and second derivative."""
-        n_points = len(self.normalized_a_scan)
-        derivative = np.zeros_like(self.normalized_a_scan)
-        second_derivative = np.zeros_like(self.normalized_a_scan)
-
-        for n in range(1, n_points - 1):
-            h = self.depth_data["Depth"][n] - self.depth_data["Depth"][n - 1]
-            derivative[n] = (
-                self.normalized_a_scan[n + 1] - self.normalized_a_scan[n - 1]
-            ) / (self.depth_data["Depth"][n + 1] - self.depth_data["Depth"][n - 1])
-            second_derivative[n] = (
-                self.normalized_a_scan[n + 1]
-                - 2 * self.normalized_a_scan[n]
-                + self.normalized_a_scan[n - 1]
-            ) / (h * h)
-
-        return derivative, second_derivative
-
-    def approach_1(self, begin_skip):
-        """
-        Function for apporach 1 : derivative switches sign neg to pos
-        """
-        derivative, _ = self.compute_derivatives()
-        old_value = derivative[begin_skip]
-        for n in range(begin_skip + 1, 98):
-            new_value = derivative[n]
-            if old_value < 0 and new_value > 0:
-                self.min_location_index = n
-                break
-            else:
-                old_value = new_value
-
-    def approach_2(self, begin_skip, end_skip):
-        """location of the largest change in the derivative."""
-        derivative, _ = self.compute_derivatives()
-        diff = np.diff(derivative[begin_skip : len(self.normalized_a_scan) - end_skip])
-        self.min_location_index = begin_skip + np.argmax(diff)
-
-
-class SkinRoughness:
-    def __init__(self, data_file, scan_id, exposed, location, return_visit):
-        self.data_file = data_file
-
-        _roughness_data = pd.read_csv(data_file, header=None, encoding="latin1")
-        self.Ra = _roughness_data.iloc[0, 1]
-        self.Rz = _roughness_data.iloc[1, 1]
-        self.Rq = _roughness_data.iloc[2, 1]
-
-        self.scan_id = scan_id
-        self.exposed = exposed
-        self.location = location
-        self.return_visit = return_visit
-
-
-class BloodFlow:
-    def __init__(self, data_file, scan_id, exposed, location, return_visit):
-        self.data_file = data_file
-        bloodflow_depth_data = pd.read_csv(data_file, header=1, encoding="latin1")
-        self.depth = bloodflow_depth_data["Depth (mm)"]
-        self.vascular_density = bloodflow_depth_data["Vascular density"]
-        self.vessel_diameter = bloodflow_depth_data["Vessel diameter"]
-        plexus_data = pd.read_csv(data_file, header=0, nrows=0, encoding="latin1")
-        self.plexus_data = float(plexus_data.columns[1].split(" ")[0])
-        self.scan_id = scan_id
-        self.exposed = exposed
-        self.location = location
-        self.return_visit = return_visit
-        self.max_density = None
-        self.max_diameter = None
-    
-
-    def plot_vascular_density(self, subject_id):
-        """
-        Plot the vasuclar density plot ( vessel depth and vessel density)
-        """
-        fig, ax = plt.subplots()
-        plt.plot(
-            self.depth,
-            self.vascular_density,
-        )
-
-        # plt.xticks(visible=False)
-        if self.exposed:
-            plt.title(
-                f"Subject id: {subject_id}  Scan id: {self.scan_id} Post-Exposure Location {self.location}"
-            )
-        else:
-            plt.title(
-                f"Subject id: {subject_id}  Scan id: {self.scan_id} Pre-Exposure Location {self.location}"
-            )
-        plt.ylim(bottom=0)
-        plt.ylabel("")
-        plt.xlabel("Depth (mm)")
-        plt.xlim(bottom=0)
-        plt.legend()
-        # plt.savefig(f"../data_out/epidermal_data_out/subject_id_{subject_id}_scan_id_{self.scan_id}.pdf")
-        # plt.close()
-        plt.show()
-
-    def get_max_density(self):
-        """Find the maximum density value."""
-        self.max_density = self.vascular_density.max()
-        return self.max_density
-
-    def get_max_diameter(self):
-        """ "Find the maximum diameter value."""
-        self.max_diameter = self.vessel_diameter.max()
-        return self.max_diameter
-
-    def get_depth_max_diameter(self):
-        """Find the location at the maximum diameter value."""
-        index = np.argmax(self.vessel_diameter)
-        return self.depth[index]
