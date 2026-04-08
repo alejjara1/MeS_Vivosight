@@ -5,7 +5,42 @@ from matplotlib.ticker import AutoMinorLocator
 from all_subjects_data_collector import DataFactory
 
 
-def plot_depth_by_location(depth_data, plot_dir, legend=False):
+def _draw_top_marker(
+    ax, x_pos, label, line_y, line_half_width, hook_height, fontsize=12
+):
+    ax.plot(
+        [x_pos - line_half_width, x_pos + line_half_width],
+        [line_y, line_y],
+        color="black",
+        linewidth=1,
+    )
+    ax.plot(
+        [x_pos - line_half_width, x_pos - line_half_width],
+        [line_y, line_y - hook_height],
+        color="black",
+        linewidth=1,
+    )
+    ax.plot(
+        [x_pos + line_half_width, x_pos + line_half_width],
+        [line_y, line_y - hook_height],
+        color="black",
+        linewidth=1,
+    )
+    ax.text(
+        x_pos,
+        line_y + hook_height * 0.35,
+        label,
+        ha="center",
+        va="bottom",
+        fontsize=fontsize,
+    )
+
+
+def _draw_significance_marker(ax, x_pos, star, line_y, line_half_width, hook_height):
+    _draw_top_marker(ax, x_pos, star, line_y, line_half_width, hook_height)
+
+
+def plot_depth_by_location(depth_data, plot_dir, data_type, legend=False):
     """
     Plot the epidermal depths by location
 
@@ -13,6 +48,8 @@ def plot_depth_by_location(depth_data, plot_dir, legend=False):
         depth_data: dict with structure {subject_id: {loc: {"pre": value, "post": value}}}
     """
     plt.figure(figsize=(10, 6))
+    count_by_loc = {loc: 0 for loc in [1, 2, 3, 4]}
+    all_y_vals = []
     for exposure, subjects in depth_data.items():
         for subject_id, locations in subjects.items():
             for loc in [1, 2, 3, 4]:
@@ -27,6 +64,8 @@ def plot_depth_by_location(depth_data, plot_dir, legend=False):
                     continue
 
                 if pre_vals > 0 and post_vals > 0:
+                    count_by_loc[loc] += 1
+                    all_y_vals.extend([pre_vals, post_vals])
 
                     x_vals = [loc - 0.1, loc + 0.1]
                     y_vals = [pre_vals, post_vals]
@@ -41,6 +80,24 @@ def plot_depth_by_location(depth_data, plot_dir, legend=False):
                     plt.scatter(
                         loc + 0.1, post_vals, color="red", edgecolor="black", zorder=3
                     )
+
+    max_y = max(all_y_vals) if all_y_vals else 0.05
+    min_y = min(all_y_vals) if all_y_vals else 0.0
+    y_range = max_y - min_y
+    marker_y = max_y + y_range * 0.06
+    label_y = marker_y + y_range * 0.05
+
+    ax = plt.gca()
+    for loc in [1, 2, 3, 4]:
+        _draw_top_marker(
+            ax,
+            loc,
+            f"N={count_by_loc[loc]}",
+            marker_y,
+            line_half_width=0.12,
+            hook_height=y_range * 0.012,
+            fontsize=11,
+        )
 
     # Legend
     if legend:
@@ -60,18 +117,16 @@ def plot_depth_by_location(depth_data, plot_dir, legend=False):
     plt.yticks(fontsize=12)
     plt.xlabel("Scan Location", fontsize=14)
     plt.ylabel("Epidermal Thickness ($\mu$m)", fontsize=14)
-    # plt.ylim(0, None)
-    # plt.title("Inflection Depths by Location")
-    ax = plt.gca()
+    plt.ylim(min_y - y_range * 0.05, label_y + y_range * 0.08)
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
     ax.grid(True, which="major", axis="y", linestyle="--", alpha=0.7)
     ax.grid(True, which="minor", axis="y", linestyle="--", alpha=0.35)
     plt.tight_layout()
-    plt.savefig(plot_dir + "epidermis_vs_location.pdf")
+    plt.savefig(plot_dir + data_type + "_vs_location.pdf")
 
 
 def plot_depth_by_location_exposure(
-    depth_data_by_exposure, plot_dir, label_points=False, legend=False
+    depth_data_by_exposure, plot_dir, data_type, label_points=False, legend=False
 ):
     """
     Plot epidermal depths by location and exposure level
@@ -81,6 +136,11 @@ def plot_depth_by_location_exposure(
         label_points: bool, whether to label points with subject IDs
     """
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
+    count_by_exposure = {
+        exposure: {loc: 0 for loc in [1, 2, 3, 4]}
+        for exposure in ["Low", "Med", "High"]
+    }
+    all_y_vals = []
 
     # Map exposure levels to subplot indices
     exposure_map = {"Low": 0, "Med": 1, "High": 2}
@@ -100,6 +160,8 @@ def plot_depth_by_location_exposure(
                     continue
 
                 if pre_vals > 0 and post_vals > 0:
+                    count_by_exposure[exposure][loc] += 1
+                    all_y_vals.extend([pre_vals, post_vals])
 
                     x_vals = [loc - 0.1, loc + 0.1]
                     y_vals = [pre_vals, post_vals]
@@ -137,10 +199,27 @@ def plot_depth_by_location_exposure(
                             va="bottom",
                         )
 
+    max_y = max(all_y_vals) if all_y_vals else 0.05
+    min_y = min(all_y_vals) if all_y_vals else 0.0
+    y_range = max_y - min_y
+    marker_y = max_y + y_range * 0.06
+    label_y = marker_y + y_range * 0.05
+
     # Style each subplot
     for idx, (exposure_name, ax) in enumerate(
         [("Low", axes[0]), ("Med", axes[1]), ("High", axes[2])]
     ):
+        for loc in [1, 2, 3, 4]:
+            _draw_top_marker(
+                ax,
+                loc,
+                f"N={count_by_exposure[exposure_name][loc]}",
+                marker_y,
+                line_half_width=0.12,
+                hook_height=y_range * 0.012,
+                fontsize=11,
+            )
+
         ax.yaxis.set_minor_locator(AutoMinorLocator(2))
         ax.grid(True, which="major", axis="y", linestyle="--", alpha=0.7)
         ax.grid(True, which="minor", axis="y", linestyle="--", alpha=0.35)
@@ -149,6 +228,7 @@ def plot_depth_by_location_exposure(
         ax.set_xticklabels([f"{i}" for i in range(1, 5)], fontsize=12)
         ax.tick_params(axis="y", labelsize=12)
         ax.set_xlabel("Scan Location", fontsize=14)
+        ax.set_ylim(min_y - y_range * 0.05, label_y + y_range * 0.08)
         # ax.set_ylim(0, None)
         if idx == 0:
             ax.set_ylabel("Epidermal Thickness ($\mu$m)", fontsize=14)
@@ -168,40 +248,29 @@ def plot_depth_by_location_exposure(
         )
 
     plt.tight_layout()
-    plt.savefig(plot_dir + "depth_vs_location_by_exposure.pdf", bbox_inches="tight")
+    plt.savefig(
+        plot_dir + data_type + "_vs_location_by_exposure.pdf", bbox_inches="tight"
+    )
 
 
 def plot_box_by_location(
-    combined_depth_data_by_location,
-    stats_by_loc,
-    data_type,
-    y_label,
-    plot_dir,
-    legend=False,
+    combined_depth_data_by_location, stats_by_loc, data_type, y_label, plot_dir
 ):
     """
-    Box and whisker plot of epidermal depths by location with separate pre/post boxes.
-
-    Args:
-        combined_depth_data_by_location: dict with structure {loc: {"pre": [values], "post": [values]}}
-        stats_by_loc: dict with structure {loc: {"p_val": float, "star": str}}
+    Box and whisker plot of epidermal depths differences by location.
     """
-    pre_by_loc = {
-        loc: combined_depth_data_by_location[loc]["pre"]
-        for loc in DataFactory.LOCATIONS
-    }
-    post_by_loc = {
-        loc: combined_depth_data_by_location[loc]["post"]
+    diff_by_loc = {
+        loc: combined_depth_data_by_location[loc]["diff"]
         for loc in DataFactory.LOCATIONS
     }
 
     plot_data = []
     positions = []
-    colors = []
+    box_colors = []
     for loc in [1, 2, 3, 4]:
-        plot_data.extend([pre_by_loc[loc], post_by_loc[loc]])
-        positions.extend([loc - 0.2, loc + 0.2])
-        colors.extend(["blue", "red"])
+        plot_data.extend([diff_by_loc[loc]])
+        positions.extend([loc])
+        box_colors.append("lightblue" if loc in [1, 2] else "bisque")
 
     plt.figure(figsize=(10, 6))
     bp = plt.boxplot(
@@ -211,60 +280,54 @@ def plot_box_by_location(
         showfliers=True,
         patch_artist=True,
         medianprops=dict(color="black", linewidth=1.5),
+        boxprops=dict(facecolor="None"),
     )
-    for patch, color in zip(bp["boxes"], colors):
-        patch.set_facecolor(color)
+
+    for box, color in zip(bp["boxes"], box_colors):
+        box.set_facecolor(color)
 
     # Find min/max y for consistent star placement
     all_vals = []
     for loc in [1, 2, 3, 4]:
-        all_vals.extend(pre_by_loc[loc] + post_by_loc[loc])
+        all_vals.extend(diff_by_loc[loc])
     max_y = max(all_vals) if all_vals else 0.05
     min_y = min(all_vals) if all_vals else 0.0
-    star_y = max_y * 1.08
+    y_range = max_y - min_y
+    marker_y = max_y + y_range * 0.06
+    star_y = marker_y + y_range * 0.05
 
-    # Add significance stars for pre vs post per location
+    # Add significance stars
     for loc in [1, 2, 3, 4]:
         if loc not in stats_by_loc:
             continue
         star = stats_by_loc[loc]["star"]
-        plt.plot([loc - 0.2, loc + 0.2], [star_y, star_y], color="black", linewidth=1)
-        plt.text(loc, star_y, star, ha="center", va="bottom", fontsize=12)
+        _draw_significance_marker(
+            plt.gca(),
+            loc,
+            star,
+            marker_y,
+            line_half_width=0.12,
+            hook_height=y_range * 0.012,
+        )
+
     plt.xlabel("Scan Location", fontsize=14)
     plt.ylabel(y_label, fontsize=14)
     plt.xticks([1, 2, 3, 4], ["1", "2", "3", "4"], fontsize=12)
-    plt.ylim(min_y * 0.85, max_y * 1.15)
-
-    if legend:
-        blue_patch = mpatches.Patch(color="blue", label="Pre-Exposure")
-        red_patch = mpatches.Patch(color="red", label="Post-Exposure")
-        plt.legend(
-            handles=[blue_patch, red_patch],
-            loc="lower center",
-            ncol=2,
-            fontsize=12,
-            bbox_to_anchor=(0.5, 0.0),
-            frameon=True,
-        )
+    plt.ylim(min_y - y_range * 0.15, star_y + y_range * 0.08)
 
     ax = plt.gca()
     ax.yaxis.set_minor_locator(AutoMinorLocator(2))
     ax.grid(True, which="major", axis="y", linestyle="--", alpha=0.7)
     ax.grid(True, which="minor", axis="y", linestyle="--", alpha=0.35)
     plt.tight_layout()
-    plt.savefig(plot_dir + f"{data_type}_boxplot_by_location.pdf")
+    plt.savefig(plot_dir + f"boxplot_by_location_{data_type}.pdf")
 
 
 def plot_box_by_location_exposure(
-    exposure_data_dict, exposure_stats_dict, data_type, y_label, plot_dir, legend=False
+    exposure_data_dict, exposure_stats_dict, data_type, y_label, plot_dir
 ):
     """
-    Box and whisker plot of epidermal depths by location and exposure
-    with separate pre/post boxes.
-
-    Args:
-        exposure_data_dict: dict with structure {exposure: {"pre": {loc: [values]}, "post": {loc: [values]}}}
-        exposure_stats_dict: dict with structure {exposure: {loc: {"p_val": float, "star": str}}}
+    Box and whisker plot of differences by location and exposure.
     """
     exposure_groups = ["Low", "Med", "High"]
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=False)
@@ -272,27 +335,26 @@ def plot_box_by_location_exposure(
     # Calculate global max for consistent y-axis
     all_exposure_vals = []
     for exposure in exposure_groups:
-        pre_by_loc = exposure_data_dict[exposure]["pre"]
-        post_by_loc = exposure_data_dict[exposure]["post"]
+        diff_by_loc = exposure_data_dict[exposure]["diff"]
         for loc in [1, 2, 3, 4]:
-            all_exposure_vals.extend(pre_by_loc[loc] + post_by_loc[loc])
+            all_exposure_vals.extend(diff_by_loc[loc])
 
     max_y_all = max(all_exposure_vals) if all_exposure_vals else 0.05
     min_y_all = min(all_exposure_vals) if all_exposure_vals else 0.00
+    y_range_all = max_y_all - min_y_all
 
     # Plot with consistent y limits
     for idx, exposure in enumerate(exposure_groups):
-        pre_by_loc = exposure_data_dict[exposure]["pre"]
-        post_by_loc = exposure_data_dict[exposure]["post"]
+        diff_by_loc = exposure_data_dict[exposure]["diff"]
         stats_by_loc = exposure_stats_dict[exposure]
 
         plot_data = []
         positions = []
-        colors = []
+        box_colors = []
         for loc in [1, 2, 3, 4]:
-            plot_data.extend([pre_by_loc[loc], post_by_loc[loc]])
-            positions.extend([loc - 0.2, loc + 0.2])
-            colors.extend(["blue", "red"])
+            plot_data.extend([diff_by_loc[loc]])
+            positions.extend([loc])
+            box_colors.append("lightblue" if loc in [1, 2] else "bisque")
 
         bp = axes[idx].boxplot(
             plot_data,
@@ -301,25 +363,30 @@ def plot_box_by_location_exposure(
             showfliers=True,
             patch_artist=True,
             medianprops=dict(color="black", linewidth=1.5),
+            boxprops=dict(facecolor="None"),
         )
-        for patch, color in zip(bp["boxes"], colors):
-            patch.set_facecolor(color)
+
+        for box, color in zip(bp["boxes"], box_colors):
+            box.set_facecolor(color)
 
         # Use global max y for consistent star placement across all exposures
-        star_y_exp = max_y_all * 1.08
+        marker_y_exp = max_y_all + y_range_all * 0.06
+        star_y_exp = marker_y_exp + y_range_all * 0.05
 
-        # Add significance stars for pre vs post per location
+        # Add significance stars
         for loc in [1, 2, 3, 4]:
             if loc not in stats_by_loc:
                 continue
             star = stats_by_loc[loc]["star"]
-            axes[idx].plot(
-                [loc - 0.2, loc + 0.2],
-                [star_y_exp, star_y_exp],
-                color="black",
-                linewidth=1,
+            _draw_significance_marker(
+                axes[idx],
+                loc,
+                star,
+                marker_y_exp,
+                line_half_width=0.12,
+                hook_height=y_range_all * 0.012,
             )
-            axes[idx].text(loc, star_y_exp, star, ha="center", va="bottom", fontsize=8)
+
         axes[idx].set_title(f"Exposure: {exposure}", fontsize=14)
         axes[idx].set_xlabel("Scan Location", fontsize=14)
         axes[idx].set_xticks([1, 2, 3, 4])
@@ -328,26 +395,15 @@ def plot_box_by_location_exposure(
         axes[idx].yaxis.set_minor_locator(AutoMinorLocator(2))
         axes[idx].grid(True, which="major", axis="y", linestyle="--", alpha=0.7)
         axes[idx].grid(True, which="minor", axis="y", linestyle="--", alpha=0.35)
-        axes[idx].set_ylim(min_y_all * 0.85, max_y_all * 1.15)
+        axes[idx].set_ylim(
+            min_y_all - y_range_all * 0.15, star_y_exp + y_range_all * 0.08
+        )
         if idx == 0:
             axes[idx].set_ylabel(y_label, fontsize=14)
 
-    # Single legend at bottom
-    if legend:
-        blue_patch = mpatches.Patch(color="blue", label="Pre-Exposure")
-        red_patch = mpatches.Patch(color="red", label="Post-Exposure")
-        fig.legend(
-            handles=[blue_patch, red_patch],
-            loc="lower center",
-            ncol=2,
-            fontsize=12,
-            bbox_to_anchor=(0.525, 0.125),
-            frameon=True,
-        )
-
     plt.tight_layout()
     plt.savefig(
-        plot_dir + f"{data_type}_boxplot_by_location_exposure.pdf",
+        plot_dir + f"boxplot_by_location_exposure_{data_type}.pdf",
         bbox_inches="tight",
     )
 

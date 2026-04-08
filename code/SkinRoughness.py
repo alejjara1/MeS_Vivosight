@@ -33,6 +33,22 @@ class LocationData:
     ):
         self.post.append(Skinscan(Ra, Rz, Rq))
 
+    def get_pre_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.pre
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
+        return np.mean(values) if len(values) > 1 else None
+
+    def get_post_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.post
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
+        return np.mean(values) if len(values) > 1 else None
+
 
 class SkinRoughness:
     def __init__(self, data_file, scan_id, exposed, location, return_visit):

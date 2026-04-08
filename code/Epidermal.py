@@ -48,12 +48,20 @@ class LocationData:
             EpidermalScan(depth, approach, scan_id, sid, AuC, attenuation_coeff)
         )
 
-    def get_pre_average(self):
-        values = [p.depth for p in self.pre if p.depth is not None and p.depth > 0]
+    def get_pre_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.pre
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
         return np.mean(values) if len(values) > 1 else None
 
-    def get_post_average(self):
-        values = [p.depth for p in self.post if p.depth is not None and p.depth > 0]
+    def get_post_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.post
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
         return np.mean(values) if len(values) > 1 else None
 
 

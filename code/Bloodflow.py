@@ -40,21 +40,21 @@ class LocationData:
             Bloodscan(max_density, depth_max_diameter, max_diameter, plexus_depth)
         )
 
-    # def get_pre_average(self):
-    #     values = [
-    #         p.max_diameter
-    #         for p in self.pre
-    #         if p.max_diameter is not None and p.max_diameter > 0
-    #     ]
-    #     return np.mean(values) if len(values) > 1 else None
+    def get_pre_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.pre
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
+        return np.mean(values) if len(values) > 1 else None
 
-    # def get_post_average(self):
-    #     values = [
-    #         p.max_diameter
-    #         for p in self.post
-    #         if p.max_diameter is not None and p.max_diameter > 0
-    #     ]
-    #     return np.mean(values) if len(values) > 1 else None
+    def get_post_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.post
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
+        return np.mean(values) if len(values) > 1 else None
 
 
 class BloodFlow:

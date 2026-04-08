@@ -147,7 +147,7 @@ class Visit:
                 self.skin_surface_data
             )
 
-    def get_all_location_averages(self):
+    def get_all_location_averages(self, data_type):
         """
         Calculate pre and post averages for all locations.
 
@@ -157,8 +157,8 @@ class Visit:
         averages = {}
         for location in [1, 2, 3, 4]:
             averages[location] = {
-                "pre": self.inflection_depths[location].get_pre_average(),
-                "post": self.inflection_depths[location].get_post_average(),
+                "pre": self.inflection_depths[location].get_pre_average(data_type),
+                "post": self.inflection_depths[location].get_post_average(data_type),
             }
         return averages
 
@@ -197,7 +197,7 @@ class Visit:
                         f.write(
                             f"    {i}. Depth: {depth_str}, Approach: {point.approach}, Scan ID: {point.scan_id}\n"
                         )
-                    pre_avg = loc_data.get_pre_average()
+                    pre_avg = loc_data.get_pre_average("depth")
                     pre_str = f"{pre_avg:.4f} mm" if pre_avg is not None else "N/A"
                     f.write(f"    Average: {pre_str}\n")
                 else:
@@ -217,7 +217,7 @@ class Visit:
                         f.write(
                             f"    {i}. Depth: {depth_str}, Approach: {point.approach}, Scan ID: {point.scan_id}\n"
                         )
-                    post_avg = loc_data.get_post_average()
+                    post_avg = loc_data.get_post_average("depth")
                     post_str = f"{post_avg:.4f} mm" if post_avg is not None else "N/A"
                     f.write(f"    Average: {post_str}\n")
                 else:
@@ -228,7 +228,7 @@ class Visit:
             # Summary averages
             f.write("\nSummary - All Locations Averages:\n")
             f.write("=" * 60 + "\n")
-            averages = self.get_all_location_averages()
+            averages = self.get_all_location_averages("depth")
             for location, avgs in averages.items():
                 pre_str = f"{avgs['pre']:.4f}" if avgs["pre"] is not None else "N/A"
                 post_str = f"{avgs['post']:.4f}" if avgs["post"] is not None else "N/A"

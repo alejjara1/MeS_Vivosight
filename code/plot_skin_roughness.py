@@ -14,8 +14,8 @@ if __name__ == "__main__":
     scan_folder = "data/scan_information/"
     file_subject_codes = "data/SubjectCodes.xlsx"
 
-    # Subje ct id modifications
-    subject_id_skip = ["E50", "Leena", "R22"]
+    # Subject id modifications
+    subject_id_skip = ["E50", "Leena", "R22", "E11"]
     subject_id_swap = {"Z47": "Z65"}
 
     # Collect depth data for plotting, boxplot data, and scatter data
@@ -38,66 +38,63 @@ if __name__ == "__main__":
         "Rq ($\mu$m)",
     ]
 
-    # Variants: raw + both outlier approaches
-    variants = [
-        {"name": "raw", "method": None, "Q": 0.01, "multiplier": 1.5},
-        {"name": "rout_Q001", "method": "rout", "Q": 0.01, "multiplier": 1.5},
-        {"name": "iqr_1p5", "method": "iqr", "Q": 0.01, "multiplier": 1.5},
-    ]
+    all_sig_results = {}
 
     for data_type, label in zip(data_types, labels):
 
-        (
-            combined_data_by_exposure,
-            combined_data_by_location,
-        ) = collector.combine_subject_data_by_location(
+        data_plot_dir = plot_dir + data_type + "/"
+        os.makedirs(data_plot_dir, exist_ok=True)
+
+        # Data exploration
+        average_depth_data_by_exposure = collector.collect_averaged_data_by_exposure(
             subject_data, "skin_roughness_data", data_type
         )
 
-        for v in variants:
+        plotting.plot_depth_by_location(
+            average_depth_data_by_exposure, data_plot_dir, data_type
+        )
+        plotting.plot_depth_by_location_exposure(
+            average_depth_data_by_exposure, data_plot_dir, data_type, label_points=False
+        )
 
-            print(v)
-
-            method = v["method"]
-            variant_name = v["name"]
-
-            if method is None:
-                loc_data = combined_data_by_location
-                exp_data = combined_data_by_exposure
-            else:
-                loc_data = outliers._clean_location_data(
-                    combined_data_by_location,
-                    method=method,
-                    Q=v["Q"],
-                    multiplier=v["multiplier"],
-                )
-                exp_data = outliers._clean_exposure_data(
-                    combined_data_by_exposure,
-                    method=method,
-                    Q=v["Q"],
-                    multiplier=v["multiplier"],
-                )
-
-            stats_by_loc = all_subjects_data_collector.compute_box_stats_by_location(
-                loc_data
+        combined_data_by_exposure, combined_data_by_location = (
+            collector.collect_difference_by_location_exposure(
+                subject_data, "skin_roughness_data", data_type
             )
-            exposure_stats = all_subjects_data_collector.compute_box_stats_by_exposure(
-                exp_data
-            )
+        )
 
-            data_type_tag = f"{data_type}_{variant_name}"
+        stats_by_loc = all_subjects_data_collector.compute_box_stats_by_location(
+            combined_data_by_location
+        )
+        exposure_stats = all_subjects_data_collector.compute_box_stats_by_exposure(
+            combined_data_by_exposure
+        )
 
-            plotting.plot_box_by_location(
-                loc_data,
-                stats_by_loc,
-                data_type_tag,
-                label,
-                plot_dir,
-            )
-            plotting.plot_box_by_location_exposure(
-                exp_data,
-                exposure_stats,
-                data_type_tag,
-                label,
-                plot_dir,
-            )
+        data_type_tag = f"{data_type}"
+
+        all_sig_results[data_type] = {
+            "stats_by_loc": stats_by_loc,
+            "exposure_stats": exposure_stats,
+            "combined_data_by_location": combined_data_by_location,
+            "combined_data_by_exposure": combined_data_by_exposure,
+        }
+
+        plotting.plot_box_by_location(
+            combined_data_by_location,
+            stats_by_loc,
+            data_type_tag,
+            label,
+            data_plot_dir,
+        )
+        plotting.plot_box_by_location_exposure(
+            combined_data_by_exposure,
+            exposure_stats,
+            data_type_tag,
+            label,
+            data_plot_dir,
+        )
+
+    all_subjects_data_collector.write_significant_results(
+        plot_dir + "significant_results.txt",
+        all_sig_results,
+    )

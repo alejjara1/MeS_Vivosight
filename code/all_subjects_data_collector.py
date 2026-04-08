@@ -3,7 +3,7 @@ import numpy as np
 from scipy import stats
 
 
-def compute_wilcoxon_stats(pre_vals, post_vals, context_label):
+def compute_pre_post_wilcoxon_stats(pre_vals, post_vals, context_label):
     """
     Compute Wilcoxon statistics for pre vs post measurements.
 
@@ -43,6 +43,38 @@ def compute_wilcoxon_stats(pre_vals, post_vals, context_label):
     return p_val, star
 
 
+def compute_wilcoxon_stats(diff_vals, context_label):
+    """
+    Compute Wilcoxon signed-rank test statistics for difference values.
+    Args:
+        diff_vals: List of difference values (post - pre)
+        context_label: String label for context (printed with results)
+    Returns:
+        Tuple of (p_value, significance_star) or (None, None) if insufficient data
+    """
+    if len(diff_vals) < 2:
+        return None, None
+
+    _, p_val = stats.wilcoxon(diff_vals)
+
+    if np.isnan(p_val):
+        return None, None
+
+    if p_val < 0.001:
+        star = "***"
+    elif p_val < 0.01:
+        star = "**"
+    elif p_val < 0.05:
+        star = "*"
+    else:
+        star = "ns"
+
+    # print(
+    #     f"Wilcoxon stats | context={context_label} | N={len(diff_vals)} | p={p_val:.4g} | star={star}"
+    # )
+    return p_val, star
+
+
 def compute_box_stats_by_location(data_by_loc):
     """
     Compute Wilcoxon statistics for data by location.
@@ -55,10 +87,9 @@ def compute_box_stats_by_location(data_by_loc):
     """
     stats_by_loc = {}
     for loc in DataFactory.LOCATIONS:
-        pre_vals = data_by_loc[loc]["pre"]
-        post_vals = data_by_loc[loc]["post"]
+        diff_vals = data_by_loc[loc]["diff"]
         p_val, star = compute_wilcoxon_stats(
-            pre_vals, post_vals, context_label=f"all | location={loc}"
+            diff_vals, context_label=f"all | location={loc}"
         )
         if p_val is not None:
             stats_by_loc[loc] = {"p_val": p_val, "star": star}
@@ -80,17 +111,77 @@ def compute_box_stats_by_exposure(exposure_data):
     for exposure in DataFactory.EXPOSURES:
         exposure_stats[exposure] = {}
         for loc in DataFactory.LOCATIONS:
-            pre_vals = exposure_data[exposure]["pre"][loc]
-            post_vals = exposure_data[exposure]["post"][loc]
+            diff_vals = exposure_data[exposure]["diff"][loc]
             p_val, star = compute_wilcoxon_stats(
-                pre_vals,
-                post_vals,
+                diff_vals,
                 context_label=f"exposure={exposure} | location={loc}",
             )
             if p_val is not None:
                 exposure_stats[exposure][loc] = {"p_val": p_val, "star": star}
 
     return exposure_stats
+
+
+def write_significant_results(path, all_results):
+    """
+    Write a single summary of significant Wilcoxon results across all data types.
+
+    Args:
+        path: output file path
+        all_results: dict {data_type: {stats_by_loc, exposure_stats,
+                                       combined_data_by_location, combined_data_by_exposure}}
+    """
+    lines = []
+    lines.append("Significant Results Summary")
+    lines.append("=" * 50)
+
+    for data_type, r in all_results.items():
+        stats_by_loc = r["stats_by_loc"]
+        exposure_stats = r["exposure_stats"]
+        combined_data_by_location = r["combined_data_by_location"]
+        combined_data_by_exposure = r["combined_data_by_exposure"]
+
+        lines.append("")
+        lines.append(f"Variable: {data_type}")
+        lines.append("-" * 50)
+
+        lines.append("  By Location (all exposures combined)")
+        any_sig = False
+        for loc in sorted(stats_by_loc):
+            s = stats_by_loc[loc]
+            if s["star"] == "ns":
+                continue
+            n = len(combined_data_by_location[loc]["diff"])
+            lines.append(
+                f"    Location {loc}: N={n:>2},  p={s['p_val']:.4g},  {s['star']}"
+            )
+            any_sig = True
+        if not any_sig:
+            lines.append("    (none)")
+
+        lines.append("")
+        lines.append("  By Location and Exposure")
+        any_sig_exp = False
+        for exposure in ["Low", "Med", "High"]:
+            loc_stats = exposure_stats.get(exposure, {})
+            for loc in sorted(loc_stats):
+                s = loc_stats[loc]
+                if s["star"] == "ns":
+                    continue
+                n = len(combined_data_by_exposure[exposure]["diff"][loc])
+                lines.append(
+                    f"    {exposure:<4} - Location {loc}: N={n:>2},  p={s['p_val']:.4g},  {s['star']}"
+                )
+                any_sig_exp = True
+        if not any_sig_exp:
+            lines.append("    (none)")
+
+    lines.append("")
+
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+    print(f"Significant results written to {path}")
 
 
 class DataFactory:
@@ -144,11 +235,7 @@ class AllSubjectsDataCollector:
         self.subject_ids = None
         self.subject_codes = None
 
-    def collect_averaged_data_by_exposure(
-        self,
-        subject_data,
-        data_source,
-    ):
+    def collect_averaged_data_by_exposure(self, subject_data, data_dict, data_source):
         """
         Generic function to collect averaged data by exposure level.
 
@@ -168,26 +255,29 @@ class AllSubjectsDataCollector:
             result[exposure][subject_id] = {}
 
             for loc in DataFactory.LOCATIONS:
-                loc_data = getattr(visit, data_source)[loc]
-                loc_values = {
-                    "pre": loc_data.get_pre_average(),
-                    "post": loc_data.get_post_average(),
-                }
+                loc_data = getattr(visit, data_dict)[loc]
+                pre = loc_data.get_pre_average(data_source)
+                post = loc_data.get_post_average(data_source)
+
+                if pre is None or post is None:
+                    diff = None
+                else:
+                    diff = post - pre
+                loc_values = {"pre": pre, "post": post, "diff": diff}
                 result[exposure][subject_id][loc] = loc_values
 
         return result
 
-    def combine_subject_data_by_location(self, subject_data, data_dict, data_source):
-        """ """
+    def collect_difference_by_location_exposure(
+        self, subject_data, data_dict, data_source
+    ):
+        """Determine difference between paired pre/post subject averages by location and exposure."""
         result_exposure_location = DataFactory.create_by_exposure(
             lambda: {
-                "pre": DataFactory.create_by_location(),
-                "post": DataFactory.create_by_location(),
+                "diff": DataFactory.create_by_location(),
             }
         )
-        result_location = {
-            loc: {"pre": [], "post": []} for loc in DataFactory.LOCATIONS
-        }
+        result_location = {loc: {"diff": []} for loc in DataFactory.LOCATIONS}
 
         for subject_id in self.subject_ids:
             visit = subject_data[subject_id].visit
@@ -195,24 +285,19 @@ class AllSubjectsDataCollector:
 
             for loc in DataFactory.LOCATIONS:
                 loc_data = getattr(visit, data_dict)[loc]
-                pre_vals = [
-                    getattr(p, data_source)
-                    for p in loc_data.pre
-                    if getattr(p, data_source) is not None
-                    and getattr(p, data_source) > 0
-                ]
-                post_vals = [
-                    getattr(p, data_source)
-                    for p in loc_data.post
-                    if getattr(p, data_source) is not None
-                    and getattr(p, data_source) > 0
-                ]
+                pre_val = loc_data.get_pre_average(data_source)
+                post_val = loc_data.get_post_average(data_source)
 
-                result_location[loc]["pre"].extend(pre_vals)
-                result_location[loc]["post"].extend(post_vals)
+                # keep only complete, valid pairs
+                if pre_val is None or post_val is None:
+                    continue
+                if not (np.isfinite(pre_val) and np.isfinite(post_val)):
+                    continue
 
-                result_exposure_location[exposure]["pre"][loc].extend(pre_vals)
-                result_exposure_location[exposure]["post"][loc].extend(post_vals)
+                diff = float(post_val) - float(pre_val)
+                result_location[loc]["diff"].append(diff)
+
+                result_exposure_location[exposure]["diff"][loc].append(diff)
 
         return result_exposure_location, result_location
 

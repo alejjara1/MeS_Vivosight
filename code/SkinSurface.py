@@ -27,22 +27,38 @@ class LocationData:
     ):
         self.post.append(SkinSurfacescan(surface_area))
 
+    def get_pre_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.pre
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
+        return np.mean(values) if len(values) > 1 else None
+
+    def get_post_average(self, attribute: str):
+        values = [
+            getattr(p, attribute)
+            for p in self.post
+            if getattr(p, attribute) is not None and getattr(p, attribute) > 0
+        ]
+        return np.mean(values) if len(values) > 1 else None
+
 
 class SkinSurface:
     def __init__(self, data_file, scan_id, exposed, location, return_visit):
         self.data_file = data_file
-        self.surface_area = self.extract_surface_area()
+        self.surface_area = self.extract_surface_area(area=2.25)
         self.scan_id = scan_id
         self.exposed = exposed
         self.location = location
         self.return_visit = return_visit
 
-    def extract_surface_area(self):
+    def extract_surface_area(self, area=2.25):
         with open(self.data_file, "r") as f:
             for line in f:
                 if "Selection Surface Area is" in line:
                     # Split and take the last value
-                    return float(line.strip().split()[-1])
+                    return float(line.strip().split()[-1]) / area
 
     def get_skin_surface_data(self, skin_surface_data):
         """

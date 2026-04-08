@@ -144,33 +144,58 @@ def iqr_outlier_detection(data, multiplier=1.5):
     }
 
 
-def _clean_values(values, method=None, Q=0.01, multiplier=1.5):
-    arr = np.asarray(values, dtype=float)
-    arr = arr[np.isfinite(arr)]
+def _clean_paired_values(pre_vals, post_vals, method=None, Q=0.01, multiplier=1.5):
+    """
+    Clean paired pre/post values while preserving pair alignment.
+    Outlier detection is done on paired differences (post - pre).
+    """
+    if len(pre_vals) != len(post_vals):
+        raise ValueError(
+            f"Paired data length mismatch: pre={len(pre_vals)} post={len(post_vals)}"
+        )
 
-    if arr.size == 0 or method is None:
-        return arr.tolist()
+    pairs = []
+    for pre, post in zip(pre_vals, post_vals):
+        if pre is None or post is None:
+            continue
+        if not (np.isfinite(pre) and np.isfinite(post)):
+            continue
+        pairs.append((float(pre), float(post)))
 
-    if method == "rout":
-        return rout_outlier_detection(arr, Q=Q)["clean_data"].tolist()
+    if not pairs:
+        return [], []
 
-    if method == "iqr":
-        return iqr_outlier_detection(arr, multiplier=multiplier)["clean_data"].tolist()
+    pre_arr = np.array([p[0] for p in pairs], dtype=float)
+    post_arr = np.array([p[1] for p in pairs], dtype=float)
 
-    raise ValueError(f"Unknown outlier method: {method}")
+    if method is None:
+        keep_mask = np.ones(len(pre_arr), dtype=bool)
+    else:
+        diffs = post_arr - pre_arr
+        if method == "rout":
+            outlier_mask = rout_outlier_detection(diffs, Q=Q)["outlier_mask"]
+        elif method == "iqr":
+            outlier_mask = iqr_outlier_detection(diffs, multiplier=multiplier)[
+                "outlier_mask"
+            ]
+        else:
+            raise ValueError(f"Unknown outlier method: {method}")
+        keep_mask = ~outlier_mask
+
+    return pre_arr[keep_mask].tolist(), post_arr[keep_mask].tolist()
 
 
 def _clean_location_data(data_by_location, method=None, Q=0.01, multiplier=1.5):
     cleaned = {}
     for loc, phase_dict in data_by_location.items():
-        cleaned[loc] = {
-            "pre": _clean_values(
-                phase_dict.get("pre", []), method=method, Q=Q, multiplier=multiplier
-            ),
-            "post": _clean_values(
-                phase_dict.get("post", []), method=method, Q=Q, multiplier=multiplier
-            ),
-        }
+        pre_clean, post_clean = _clean_paired_values(
+            phase_dict.get("pre", []),
+            phase_dict.get("post", []),
+            method=method,
+            Q=Q,
+            multiplier=multiplier,
+        )
+        cleaned[loc] = {"pre": pre_clean, "post": post_clean}
     return cleaned
 
 
@@ -178,9 +203,18 @@ def _clean_exposure_data(data_by_exposure, method=None, Q=0.01, multiplier=1.5):
     cleaned = {}
     for exposure, phase_dict in data_by_exposure.items():
         cleaned[exposure] = {"pre": {}, "post": {}}
-        for phase in ("pre", "post"):
-            for loc, vals in phase_dict.get(phase, {}).items():
-                cleaned[exposure][phase][loc] = _clean_values(
-                    vals, method=method, Q=Q, multiplier=multiplier
-                )
+        pre_dict = phase_dict.get("pre", {})
+        post_dict = phase_dict.get("post", {})
+
+        for loc in pre_dict.keys():
+            pre_clean, post_clean = _clean_paired_values(
+                pre_dict.get(loc, []),
+                post_dict.get(loc, []),
+                method=method,
+                Q=Q,
+                multiplier=multiplier,
+            )
+            cleaned[exposure]["pre"][loc] = pre_clean
+            cleaned[exposure]["post"][loc] = post_clean
+
     return cleaned

@@ -186,7 +186,6 @@ def process_subject_vivosight_data(
         vivo_folders = _vivo_folders
         scan_folders = _scan_folders
 
-    # subject_id = collect_subject_id_from_folder(vivo_folders[0])
     subject = data_types.Subject(subject_id=subject_id, exposure=exposure)
 
     for vivo_file, scan_file in zip(vivo_folders, scan_folders):
@@ -221,7 +220,7 @@ def process_subject_vivosight_data(
                 exposed = True
             else:
                 print(
-                    f"Scan ID: {scan_id} not found for {subject_id} and file {data_file}"
+                    f"Scan ID: {scan_id} not found for {subject_id} and file {data_file} and {scan_file}"
                 )
                 exposed = True
 
@@ -249,6 +248,9 @@ def process_subject_vivosight_data(
                     location_id = 3
                 elif _location_id == 1248:
                     location_id = 4
+
+            if subject_id == "G07_2" and _location_id == 1347:
+                continue
 
             try:
                 if data_type == "epidermal":
