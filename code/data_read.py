@@ -294,7 +294,9 @@ def process_subject_vivosight_data(
     return subject
 
 
-def get_all_subject_ids(vivosight_folder: str, return_visit: bool = False):
+def get_all_subject_ids(
+    vivosight_folder: str, return_visit: bool = False, skip_returns=False
+):
     """
     From the viosight folder retun a list of all unique subject ids
 
@@ -307,8 +309,14 @@ def get_all_subject_ids(vivosight_folder: str, return_visit: bool = False):
     subject_ids = []
     for fold in folder:
         _id = fold.split("/")[-1].split("_")[0]
-        if fold.split("/")[-1].split("_")[1] == "2" and return_visit:
+        is_return = fold.split("/")[-1].split("_")[1] == "2"
+
+        if is_return and skip_returns:
+            continue
+
+        if is_return and return_visit:
             _id = _id + "_2"
+
         if _id not in subject_ids:
             subject_ids.append(_id)
 

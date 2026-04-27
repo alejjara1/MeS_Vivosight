@@ -1,6 +1,9 @@
 import data_read
+import TEWL
 import numpy as np
 from scipy import stats
+import glob
+import pandas as pd
 
 
 def compute_pre_post_wilcoxon_stats(pre_vals, post_vals, context_label):
@@ -86,7 +89,10 @@ def compute_box_stats_by_location(data_by_loc):
         Dict with structure {loc: {"p_val": float, "star": str}}
     """
     stats_by_loc = {}
-    for loc in DataFactory.LOCATIONS:
+
+    locations = data_by_loc.keys()
+
+    for loc in locations:
         diff_vals = data_by_loc[loc]["diff"]
         p_val, star = compute_wilcoxon_stats(
             diff_vals, context_label=f"all | location={loc}"
@@ -108,9 +114,12 @@ def compute_box_stats_by_exposure(exposure_data):
         Dict with structure {exposure: {loc: {"p_val": float, "star": str}}}
     """
     exposure_stats = {}
+
+    locations = next(iter(exposure_data.values()))["diff"].keys()
+
     for exposure in DataFactory.EXPOSURES:
         exposure_stats[exposure] = {}
-        for loc in DataFactory.LOCATIONS:
+        for loc in locations:
             diff_vals = exposure_data[exposure]["diff"][loc]
             p_val, star = compute_wilcoxon_stats(
                 diff_vals,
@@ -135,6 +144,13 @@ def write_significant_results(path, all_results):
     lines.append("Significant Results Summary")
     lines.append("=" * 50)
 
+    def _ordered_locations(location_dict):
+        preferred = [1, 2, "1+2", 3, 4]
+        ordered = [loc for loc in preferred if loc in location_dict]
+        extras = [loc for loc in location_dict if loc not in preferred]
+        ordered.extend(extras)
+        return ordered
+
     for data_type, r in all_results.items():
         stats_by_loc = r["stats_by_loc"]
         exposure_stats = r["exposure_stats"]
@@ -147,7 +163,7 @@ def write_significant_results(path, all_results):
 
         lines.append("  By Location (all exposures combined)")
         any_sig = False
-        for loc in sorted(stats_by_loc):
+        for loc in _ordered_locations(stats_by_loc):
             s = stats_by_loc[loc]
             if s["star"] == "ns":
                 continue
@@ -164,7 +180,7 @@ def write_significant_results(path, all_results):
         any_sig_exp = False
         for exposure in ["Low", "Med", "High"]:
             loc_stats = exposure_stats.get(exposure, {})
-            for loc in sorted(loc_stats):
+            for loc in _ordered_locations(loc_stats):
                 s = loc_stats[loc]
                 if s["star"] == "ns":
                     continue
@@ -225,11 +241,17 @@ class AllSubjectsDataCollector:
     """
 
     def __init__(
-        self, vivosight_folder, scan_folder, subject_codes_file, subject_id_skip
+        self,
+        vivosight_folder,
+        scan_folder,
+        tewl_folder,
+        subject_codes_file,
+        subject_id_skip,
     ):
 
         self.vivosight_folder = vivosight_folder
         self.scan_folder = scan_folder
+        self.tewl_folder = tewl_folder
         self.subject_codes_file = subject_codes_file
         self.subject_id_skip = subject_id_skip
         self.subject_ids = None
@@ -269,7 +291,7 @@ class AllSubjectsDataCollector:
         return result
 
     def collect_difference_by_location_exposure(
-        self, subject_data, data_dict, data_source
+        self, subject_data, data_dict, data_source, combine_locations=False
     ):
         """Determine difference between paired pre/post subject averages by location and exposure."""
         result_exposure_location = DataFactory.create_by_exposure(
@@ -278,6 +300,9 @@ class AllSubjectsDataCollector:
             }
         )
         result_location = {loc: {"diff": []} for loc in DataFactory.LOCATIONS}
+
+        if combine_locations:
+            result_location["1+2"] = {"diff": []}
 
         for subject_id in self.subject_ids:
             visit = subject_data[subject_id].visit
@@ -299,6 +324,16 @@ class AllSubjectsDataCollector:
 
                 result_exposure_location[exposure]["diff"][loc].append(diff)
 
+            if combine_locations:
+                result_exposure_location[exposure]["diff"]["1+2"] = (
+                    result_exposure_location[exposure]["diff"][1]
+                    + result_exposure_location[exposure]["diff"][2]
+                )
+
+                result_location["1+2"]["diff"] = (
+                    result_location[1]["diff"] + result_location[2]["diff"]
+                )
+
         return result_exposure_location, result_location
 
     def combine_data_by_exposure(
@@ -314,7 +349,7 @@ class AllSubjectsDataCollector:
         Args:
             subject_data: Dict mapping subject_id to Subject objects with visit data
             data_dict: String name of the visit attribute containing location data
-                      (e.g., "inflection_depths")
+                      (e.g., "epidermal_data")
             data_source: String name of the attribute to extract from each measurement
                         (e.g., "depth", "sid", "AuC")
             restrict_data_source: Optional string name of an attribute to use for filtering.
@@ -330,10 +365,10 @@ class AllSubjectsDataCollector:
 
         Example:
             >>> depth_by_exposure = collector.combine_data_by_exposure(
-            ...     subject_data, "inflection_depths", "depth"
+            ...     subject_data, "epidermal_data", "depth"
             ... )
             >>> sid_by_exposure = collector.combine_data_by_exposure(
-            ...     subject_data, "inflection_depths", "sid", restrict_data_source="depth"
+            ...     subject_data, "epidermal_data", "sid", restrict_data_source="depth"
             ... )
         """
 
@@ -378,14 +413,12 @@ class AllSubjectsDataCollector:
                 result_exposure[exposure]["post"].extend(post_vals)
         return result_exposure
 
-    ###### Tim Code ####
-
-    def get_subject_ids(self):
+    def get_subject_ids(self, separate_return_visit=True, skip_returns=False):
         """
         Collects the subject IDs
         """
         self.subject_ids = data_read.get_all_subject_ids(
-            self.vivosight_folder, return_visit=True
+            self.vivosight_folder, separate_return_visit, skip_returns
         )
         for skip in self.subject_id_skip:
             if skip in self.subject_ids:
@@ -457,7 +490,6 @@ class AllSubjectsDataCollector:
         """
         subject_data = {}
         for subject_id in self.subject_ids:
-
             subject_data[subject_id] = data_read.process_subject_vivosight_data(
                 subject_id,
                 self.vivosight_folder,
@@ -488,5 +520,82 @@ class AllSubjectsDataCollector:
             )
 
             subject_data[subject_id].visit.collect_skin_surface_scans()
+
+        return subject_data
+
+    def get_tewl_data(self):
+        """
+        Collect tewl data
+        """
+        subject_data = {}
+        files_tewl_raw = glob.glob(f"{self.tewl_folder}*.xls")
+        for file in files_tewl_raw:
+            subject_id = TEWL.collect_subject_id_from_file(file)
+            if subject_id in self.subject_id_skip:
+                continue
+            new_subject_id = self.subject_codes[subject_id]["new_pid"]
+
+            new_subject_id = new_subject_id.split("_")[0]
+
+            location = TEWL.collect_location_from_file(file)
+            return_visit = TEWL.collect_return_visit_from_file(file)
+
+            data = pd.read_excel(file)
+            if subject_id not in subject_data:
+                subject_data[subject_id] = TEWL.Subject(subject_id=new_subject_id)
+
+            subject_data[subject_id].add_scan(
+                location=location,
+                return_visit=return_visit,
+                data=data,
+            )
+
+            subject_data[subject_id].set_averages()
+
+        return subject_data
+
+    def get_tewl_average(self, tewl_subject_data, location):
+        """Get the average tewl for all subjects at specified location"""
+        subject_data = {}
+        for subject_id, subject in tewl_subject_data.items():
+            subject_data[subject_id] = subject.get_average(location)
+
+        return subject_data
+
+    def get_visit_diff_data(self, visit_subject_data, data_dict, data_source, location):
+        """Get the difference data at location"""
+        subject_data = {}
+        for subject_id, subject in visit_subject_data.items():
+            loc_data = getattr(subject.visit, data_dict)[location]
+            pre_val = loc_data.get_pre_average(data_source)
+            post_val = loc_data.get_post_average(data_source)
+
+            if (
+                pre_val is None
+                or post_val is None
+                or not np.isfinite(pre_val)
+                or not np.isfinite(post_val)
+            ):
+                subject_data[subject_id] = None
+            else:
+                subject_data[subject_id] = float(post_val) - float(pre_val)
+
+        return subject_data
+
+    def get_visit_average_exposed_diff(
+        self, visit_subject_data, data_dict, data_source
+    ):
+        """Determine the average difference from the two exposed locations"""
+        diff_1 = self.get_visit_diff_data(visit_subject_data, data_dict, data_source, 1)
+        diff_2 = self.get_visit_diff_data(visit_subject_data, data_dict, data_source, 2)
+
+        subject_data = {}
+        for subject_id in visit_subject_data:
+            loc_diffs = [
+                d
+                for d in (diff_1.get(subject_id), diff_2.get(subject_id))
+                if d is not None
+            ]
+            subject_data[subject_id] = float(np.mean(loc_diffs)) if loc_diffs else None
 
         return subject_data

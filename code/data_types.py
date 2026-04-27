@@ -31,7 +31,7 @@ class Visit:
         self.before_locations = None
         self.after_locations = None
         self.after_scan_id = None
-        self.inflection_depths = {
+        self.epidermal_data = {
             1: Epidermal.LocationData(),
             2: Epidermal.LocationData(),
             3: Epidermal.LocationData(),
@@ -97,8 +97,8 @@ class Visit:
                 )
                 continue
 
-            self.inflection_depths = derm_scan.get_epidermal_data(
-                self.inflection_depths, approach
+            self.epidermal_data = derm_scan.get_epidermal_data(
+                self.epidermal_data, approach
             )
 
             if plot:
@@ -157,8 +157,8 @@ class Visit:
         averages = {}
         for location in [1, 2, 3, 4]:
             averages[location] = {
-                "pre": self.inflection_depths[location].get_pre_average(data_type),
-                "post": self.inflection_depths[location].get_post_average(data_type),
+                "pre": self.epidermal_data[location].get_pre_average(data_type),
+                "post": self.epidermal_data[location].get_post_average(data_type),
             }
         return averages
 
@@ -183,7 +183,7 @@ class Visit:
                 f.write(f"Location {location}:\n")
                 f.write("-" * 40 + "\n")
 
-                loc_data = self.inflection_depths[location]
+                loc_data = self.epidermal_data[location]
 
                 # Pre-exposure data
                 f.write("  Pre-Exposure:\n")
@@ -258,30 +258,6 @@ class Visit:
 
         self.after_scan_id = after_exposure_data["Scan#"].dropna()
         self.after_locations = after_exposure_data["Location"].dropna()
-
-    def add_tewl_scan(
-        self, scan_id, location=None, arm=None, post_exposure=None, return_visit=None
-    ):
-        """_summary_
-
-        Args:
-            visit_id (_type_): _description_
-            return_visit (_type_): _description_
-            data (_type_): _description_
-        """
-        if self.scans is None:
-            self.scans = []
-
-        self.scans.append(
-            Scan(
-                scan_id=scan_id,
-                arm=arm,
-                location=location,
-                post_exposure=post_exposure,
-                return_visit=return_visit,
-            )
-        )
-        self.num_scans += 1
 
 
 class Scan:

@@ -137,7 +137,7 @@ class Epidermal:
         ).idxmin()
 
         self.AuC = sp.integrate.trapezoid(
-            self.normalized_a_scan[lower_bound_index:upper_bound_index],
+            self.depth_data["Mean A-scan"][lower_bound_index:upper_bound_index],
             self.depth_data["Depth"][lower_bound_index:upper_bound_index],
         )
 
