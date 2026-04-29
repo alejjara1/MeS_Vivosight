@@ -156,10 +156,15 @@ def write_significant_results(path, all_results):
         exposure_stats = r["exposure_stats"]
         combined_data_by_location = r["combined_data_by_location"]
         combined_data_by_exposure = r["combined_data_by_exposure"]
+        tewl_r_squared = r.get("tewl_r_squared")
 
         lines.append("")
         lines.append(f"Variable: {data_type}")
         lines.append("-" * 50)
+        if tewl_r_squared is not None:
+            lines.append(f"  TEWL vs Δ{data_type}: R² = {tewl_r_squared:.4f}")
+        else:
+            lines.append(f"  TEWL vs Δ{data_type}: R² = N/A")
 
         lines.append("  By Location (all exposures combined)")
         any_sig = False

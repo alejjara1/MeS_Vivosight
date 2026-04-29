@@ -43,14 +43,18 @@ def run_plots(
         )
 
         plotting.plot_data_by_location(
-            average_data_by_exposure, data_plot_dir, data_type, label
+            average_data_by_exposure,
+            data_plot_dir,
+            data_type,
+            label,
+            label_points=True,
         )
         plotting.plot_data_by_location_exposure(
             average_data_by_exposure,
             data_plot_dir,
             data_type,
             label,
-            label_points=False,
+            label_points=True,
         )
 
         combined_data_by_exposure, combined_data_by_location = (
@@ -90,13 +94,15 @@ def run_plots(
             combine_locations_1_2=True,
         )
 
-        plotting.plot_subject_diff_vs_tewl(
+        tewl_r_squared = plotting.plot_subject_diff_vs_tewl(
             subject_diff,
             tewl_average,
             data_plot_dir + f"tewl_vs_{data_type}.pdf",
             x_label="Average TEWL (g/m$^2$-h) at location 1",
             y_label=f"$\\Delta$ {label}",
         )
+
+        all_sig_results[data_type]["tewl_r_squared"] = tewl_r_squared
 
     plotting.plot_subject_diff_heatmap(
         subject_diff_by_parameter,
@@ -129,7 +135,7 @@ if __name__ == "__main__":
         subject_codes_file=file_subject_codes,
         subject_id_skip=subject_id_skip,
     )
-    collector.get_subject_ids(skip_returns=False)
+    collector.get_subject_ids(skip_returns=True)
     collector.get_subject_codes(subject_id_swap)
 
     print(collector.subject_ids)

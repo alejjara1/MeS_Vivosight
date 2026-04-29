@@ -37,12 +37,15 @@ def _draw_top_marker(
     )
 
 
-def plot_data_by_location(depth_data, plot_dir, data_type, data_label, legend=False):
+def plot_data_by_location(
+    depth_data, plot_dir, data_type, data_label, label_points=False, legend=False
+):
     """
     Plot the epidermal depths by location
 
     Args:
         depth_data: dict with structure {subject_id: {loc: {"pre": value, "post": value}}}
+        label_points: bool, whether to label points with subject IDs
     """
     plt.figure(figsize=(10, 6))
 
@@ -78,6 +81,24 @@ def plot_data_by_location(depth_data, plot_dir, data_type, data_label, legend=Fa
                     plt.scatter(
                         loc + 0.1, post_vals, color="red", edgecolor="black", zorder=3
                     )
+
+                    if label_points:
+                        plt.text(
+                            loc - 0.1,
+                            pre_vals,
+                            subject_id,
+                            fontsize=8,
+                            ha="center",
+                            va="bottom",
+                        )
+                        plt.text(
+                            loc + 0.1,
+                            post_vals,
+                            subject_id,
+                            fontsize=8,
+                            ha="center",
+                            va="bottom",
+                        )
 
     max_y = max(all_y_vals) if all_y_vals else 0.05
     min_y = min(all_y_vals) if all_y_vals else 0.0
@@ -708,7 +729,7 @@ def plot_subject_diff_vs_tewl(
 
     ax.set_xlabel(x_label, fontsize=12)
     ax.set_ylabel(y_label, fontsize=12)
-    ax.set_title("TEWL vs Epidermal Difference", fontsize=13)
+    # ax.set_title("TEWL vs Param Difference", fontsize=13)
     ax.grid(True, which="major", linestyle="--", alpha=0.7)
     if r_squared is not None:
         ax.text(
@@ -724,6 +745,7 @@ def plot_subject_diff_vs_tewl(
     fig.tight_layout()
     fig.savefig(output_path)
     plt.close(fig)
+    return r_squared
 
 
 def plot_subject_diff_heatmap(
