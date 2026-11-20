@@ -2,7 +2,6 @@ import os
 import plotting
 import all_subjects_data_collector
 
-
 if __name__ == "__main__":
 
     plot_dir = "../data_out/epidermal/"

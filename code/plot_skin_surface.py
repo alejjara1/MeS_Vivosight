@@ -3,7 +3,6 @@ import plotting
 import outliers
 import all_subjects_data_collector
 
-
 if __name__ == "__main__":
 
     plot_dir = "../data_out/skin_surface/"
@@ -12,6 +11,7 @@ if __name__ == "__main__":
     # Data input location
     vivosight_folder = "data/Vivosight_data/"
     scan_folder = "data/scan_information/"
+    tewl_folder = "data/TEWL_Data/"
     file_subject_codes = "data/SubjectCodes.xlsx"
 
     # Subject id modifications
@@ -22,11 +22,12 @@ if __name__ == "__main__":
     collector = all_subjects_data_collector.AllSubjectsDataCollector(
         vivosight_folder=vivosight_folder,
         scan_folder=scan_folder,
+        tewl_folder=tewl_folder,
         subject_codes_file=file_subject_codes,
         subject_id_skip=subject_id_skip,
     )
 
-    collector.get_subject_ids()
+    collector.get_subject_ids(skip_returns=True)
     collector.get_subject_codes(subject_id_swap)
     subject_data = collector.get_skin_surface_data()
 
@@ -45,11 +46,19 @@ if __name__ == "__main__":
             subject_data, "skin_surface_data", data_type
         )
 
-        plotting.plot_depth_by_location(
-            average_depth_data_by_exposure, data_plot_dir, data_type
+        plotting.plot_data_by_location(
+            average_depth_data_by_exposure,
+            data_plot_dir,
+            data_type,
+            label,
+            label_points=True,
         )
-        plotting.plot_depth_by_location_exposure(
-            average_depth_data_by_exposure, data_plot_dir, data_type, label_points=False
+        plotting.plot_data_by_location_exposure(
+            average_depth_data_by_exposure,
+            data_plot_dir,
+            data_type,
+            label,
+            label_points=True,
         )
 
         combined_data_by_exposure, combined_data_by_location = (

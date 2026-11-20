@@ -78,6 +78,9 @@ def find_matching_subfolder(path: str, target: str) -> Path | None:
     for subfolder in parent.iterdir():
         if subfolder.is_dir():
             name = subfolder.name.lower().replace(" ", "")
+            if "old" in name:
+                continue
+            print(parent, target, name)
             if target in name:
                 return subfolder
     return None
@@ -204,7 +207,9 @@ def process_subject_vivosight_data(
         # Fix for surface area files
         if len(data_files) == 0:
             data_files = [
-                f for f in glob.glob(str(data_folder) + "/*") if not f.endswith(".xlsx")
+                f
+                for f in glob.glob(str(data_folder) + "/*")
+                if not f.endswith(".xlsx") and "OLD" not in f
             ]
 
         for data_file in data_files:
@@ -277,6 +282,7 @@ def process_subject_vivosight_data(
                         )
                     )
                 elif data_type.lower() == "surface area":
+                    print(data_file)
                     visit_data.add_skin_surface(
                         skins.SkinSurface(
                             data_file, scan_id, exposed, location_id, return_visit
